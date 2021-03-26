@@ -769,7 +769,7 @@ public class BTreeFile implements DbFile {
         //缺少的tuple数量
         final int needMoveCnt = (leftSiblingEntryNum - pageEntryNum) / 2;
         Iterator<BTreeEntry> reverseEntryIterator = leftSibling.reverseIterator();
-        for (int i = needMoveCnt - 1; i >= 0; --i) {
+        for (int i = 0; i < needMoveCnt; ++i) {
             BTreeEntry entry = reverseEntryIterator.next();
             leftSibling.deleteKeyAndRightChild(entry);
             BTreePageId pid = entry.getRightChild();
@@ -778,13 +778,13 @@ public class BTreeFile implements DbFile {
             entry.setRecordId(parentEntry.getRecordId());
             parent.updateEntry(entry);
             parentEntry.setLeftChild(pid);
-            assert page.iterator().hasNext();
             parentEntry.setRightChild(page.iterator().next().getLeftChild());
             page.insertEntry(parentEntry);
             parentEntry = entry;
         }
         //更新所有entry的父指针
         updateParentPointers(tid, dirtypages, page);
+        //更新dirtypages
         dirtypages.put(page.getId(), page);
         dirtypages.put(leftSibling.getId(), leftSibling);
         dirtypages.put(parent.getId(), parent);
