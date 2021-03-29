@@ -77,8 +77,6 @@ public class TableStats {
      * sequential-scan IO and disk seeks.
      */
 
-    private int tableid;
-
     private DbFile file;
 
     private int ioCostPerPage;
@@ -100,7 +98,6 @@ public class TableStats {
         // You should try to do this reasonably efficiently, but you don't
         // necessarily have to (for example) do everything
         // in a single scan of the table.
-        this.tableid = tableid;
         this.ioCostPerPage = ioCostPerPage;
         this.file = Database.getCatalog().getDatabaseFile(tableid);
         this.numPages = ((HeapFile) Database.getCatalog().getDatabaseFile(tableid)).numPages();
@@ -115,7 +112,7 @@ public class TableStats {
         try {
             scan.open();
             while (scan.hasNext()) {
-                this.numTuples += 1;
+                ++this.numTuples;
                 Tuple t = scan.next();
                 for (int i = 0; i < numFields; ++i) {
                     if (t.getField(i).getType() == Type.INT_TYPE) {
