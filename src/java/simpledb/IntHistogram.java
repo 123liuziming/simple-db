@@ -1,5 +1,7 @@
 package simpledb;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 /** A class to represent a fixed-width histogram over a single integer-based field.
  */
 public class IntHistogram {
@@ -20,8 +22,23 @@ public class IntHistogram {
      * @param min The minimum integer value that will ever be passed to this class for histogramming
      * @param max The maximum integer value that will ever be passed to this class for histogramming
      */
+
+    private final int[] histogram;
+
+    private final int min;
+
+    private final int max;
+
+    private final int gap;
+
+    private AtomicInteger numTuples;
+
     public IntHistogram(int buckets, int min, int max) {
-    	// some code goes here
+    	this.histogram = new int[buckets];
+    	this.min = min;
+    	this.max = max;
+    	this.gap = Math.max((max - min + 1) / buckets, 1);
+    	numTuples = new AtomicInteger(0);
     }
 
     /**
@@ -29,7 +46,12 @@ public class IntHistogram {
      * @param v Value to add to the histogram
      */
     public void addValue(int v) {
-    	// some code goes here
+        final int bucket = (v - min) / gap;
+        if (bucket < 0 || bucket >= this.histogram.length) {
+            return;
+        }
+        ++this.histogram[bucket];
+        numTuples.incrementAndGet();
     }
 
     /**
@@ -42,10 +64,70 @@ public class IntHistogram {
      * @param v Value
      * @return Predicted selectivity of this particular operator and value
      */
-    public double estimateSelectivity(Predicate.Op op, int v) {
 
-    	// some code goes here
+    public double estimateSelectivity(Predicate.Op op, int v) {
+        int bucket = (v - min) / gap;
+        final double h = bucket >= 0 && bucket < histogram.length ? histogram[bucket] : 0;
+        //bucket = Math.max(bucket, 0);
+        //bucket = Math.min(bucket, histogram.length - 1);
+        final int gapNow = bucket == histogram.length - 1 ? (max - min + 1 - (histogram.length - 1) * gap) : gap;
+        final int tupleNum = numTuples.get();
+        final int bRight = Math.min(min + (bucket + 1) * gap - 1, max);
+        final int bLeft = min + bucket * gapNow;
+
+        switch (op) {
+            case EQUALS:
+                return h / gapNow / tupleNum;
+            case NOT_EQUALS:
+                return 1 - h / gapNow / tupleNum;
+            case GREATER_THAN: {
+                double fracRight = (double) (bRight - v) / gapNow;
+                fracRight *= (h / tupleNum);
+                fracRight = Math.max(0, fracRight);
+                fracRight = addRight(bucket, fracRight);
+                return fracRight;
+            }
+            case GREATER_THAN_OR_EQ: {
+                double fracRight = (double) (bRight - v + 1) / gapNow;
+                fracRight *= (h / tupleNum);
+                fracRight = Math.max(0, fracRight);
+                fracRight = addRight(bucket, fracRight);
+                return fracRight;
+            }
+            case LESS_THAN: {
+                double fracLeft = (double) (v - bLeft) / gapNow;
+                fracLeft *= (h / tupleNum);
+                fracLeft = Math.max(0, fracLeft);
+                fracLeft = addLeft(bucket, fracLeft);
+                return fracLeft;
+            }
+            case LESS_THAN_OR_EQ: {
+                double fracLeft = (double) (v - bLeft + 1) / gapNow;
+                fracLeft *= (h / tupleNum);
+                fracLeft = Math.max(0, fracLeft);
+                fracLeft = addLeft(bucket, fracLeft);
+                return fracLeft;
+            }
+        }
         return -1.0;
+    }
+
+    private double addRight(int bucket, double fracRight) {
+        final int tupleNum = numTuples.get();
+        final int start = Math.max(0, bucket + 1);
+        for (int i = start; i < histogram.length; ++i) {
+            fracRight += ((double) histogram[i] / tupleNum);
+        }
+        return fracRight;
+    }
+
+    private double addLeft(int bucket, double fracLeft) {
+        final int tupleNum = numTuples.get();
+        final int start = Math.min(bucket - 1, histogram.length - 1);
+        for (int i = start; i >= 0; --i) {
+            fracLeft += ((double) histogram[i] / tupleNum);
+        }
+        return fracLeft;
     }
     
     /**
@@ -56,9 +138,7 @@ public class IntHistogram {
      *     join optimization. It may be needed if you want to
      *     implement a more efficient optimization
      * */
-    public double avgSelectivity()
-    {
-        // some code goes here
+    public double avgSelectivity() {
         return 1.0;
     }
     
