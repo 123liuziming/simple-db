@@ -68,8 +68,6 @@ public class IntHistogram {
     public double estimateSelectivity(Predicate.Op op, int v) {
         int bucket = (v - min) / gap;
         final double h = bucket >= 0 && bucket < histogram.length ? histogram[bucket] : 0;
-        //bucket = Math.max(bucket, 0);
-        //bucket = Math.min(bucket, histogram.length - 1);
         final int gapNow = bucket == histogram.length - 1 ? (max - min + 1 - (histogram.length - 1) * gap) : gap;
         final int tupleNum = numTuples.get();
         final int bRight = Math.min(min + (bucket + 1) * gap - 1, max);
