@@ -166,7 +166,7 @@ public class JoinOptimizer {
         else if (joinOp == Predicate.Op.EQUALS && t2pkey) {
             card = card1;
         }
-        else if (joinOp == Predicate.Op.EQUALS && !t1pkey && !t2pkey) {
+        else if (joinOp == Predicate.Op.EQUALS) {
             card = Math.max(card1, card2);
         }
         else if (joinOp == Predicate.Op.NOT_EQUALS && t1pkey && t2pkey) {
@@ -178,7 +178,7 @@ public class JoinOptimizer {
         else if (joinOp == Predicate.Op.NOT_EQUALS && t2pkey) {
             card = card1 * card2 - card1;
         }
-        else if (joinOp == Predicate.Op.NOT_EQUALS && !t1pkey && !t2pkey) {
+        else if (joinOp == Predicate.Op.NOT_EQUALS) {
             card = (card1 * card2) - Math.max(card1, card2);
         }
         else {
@@ -248,11 +248,11 @@ public class JoinOptimizer {
 
         final int len = joins.size();
         PlanCache pc = new PlanCache();
-        double bestCostSoFar = Double.MAX_VALUE;
-        for (int i = 1; i < len; ++i) {
+        for (int i = 1; i <= len; ++i) {
             Set<Set<LogicalJoinNode>> subset = enumerateSubsets(joins, i);
             for (Set<LogicalJoinNode> s : subset) {
                 CostCard bestCard = null;
+                double bestCostSoFar = Double.MAX_VALUE;
                 for (LogicalJoinNode remove : s) {
                     CostCard costCard = computeCostAndCardOfSubplan(stats, filterSelectivities, remove, s, bestCostSoFar, pc);
                     if (costCard != null) {
