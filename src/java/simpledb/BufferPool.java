@@ -75,6 +75,7 @@ public class BufferPool {
      */
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
         throws TransactionAbortedException, DbException {
+        LockManager.acquireLock(tid, pid, perm);
         try {
             DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
             if (pageCache.containsKey(pid)) {
@@ -111,8 +112,7 @@ public class BufferPool {
      * @param pid the ID of the page to unlock
      */
     public void releasePage(TransactionId tid, PageId pid) {
-        // some code goes here
-        // not necessary for lab1|lab2
+        LockManager.releaseLock(pid, tid);
     }
 
     /**
@@ -121,15 +121,12 @@ public class BufferPool {
      * @param tid the ID of the transaction requesting the unlock
      */
     public void transactionComplete(TransactionId tid) throws IOException {
-        // some code goes here
-        // not necessary for lab1|lab2
+        transactionComplete(tid, true);
     }
 
     /** Return true if the specified transaction has a lock on the specified page */
     public boolean holdsLock(TransactionId tid, PageId p) {
-        // some code goes here
-        // not necessary for lab1|lab2
-        return false;
+        return LockManager.holdsLock(tid, p);
     }
 
     /**
@@ -141,8 +138,21 @@ public class BufferPool {
      */
     public void transactionComplete(TransactionId tid, boolean commit)
         throws IOException {
-        // some code goes here
-        // not necessary for lab1|lab2
+        if (commit) {
+            flushPages(tid);
+        }
+        else {
+            Set<PageId> pages = LockManager.getTransactionPages(tid);
+            if (pages != null) {
+                for (PageId page : pages) {
+                    Page p = pageCache.get(page);
+                    if (p != null && p.isDirty() != null) {
+                        discardPage(page);
+                    }
+                }
+            }
+        }
+        LockManager.endTransaction(tid);
     }
 
     /**
@@ -197,9 +207,11 @@ public class BufferPool {
      *     break simpledb if running in NO STEAL mode.
      */
     public synchronized void flushAllPages() throws IOException {
-        // some code goes here
-        // not necessary for lab1
-
+        for (Map.Entry<PageId, Page> entry : pageCache.entrySet()) {
+            if (entry.getValue().isDirty() != null) {
+                flushPage(entry.getKey());
+            }
+        }
     }
 
     /** Remove the specific page id from the buffer pool.
@@ -221,7 +233,8 @@ public class BufferPool {
     private synchronized void flushPage(PageId pid) throws IOException {
         if (pageCache.containsKey(pid)) {
             Page p = pageCache.get(pid);
-            if (p.isDirty() != null) {
+            TransactionId tid = p.isDirty();
+            if (tid != null) {
                 DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
                 file.writePage(p);
             }
@@ -230,9 +243,13 @@ public class BufferPool {
 
     /** Write all pages of the specified transaction to disk.
      */
-    public synchronized  void flushPages(TransactionId tid) throws IOException {
-        // some code goes here
-        // not necessary for lab1|lab2
+    public synchronized void flushPages(TransactionId tid) throws IOException {
+        Set<PageId> pages = LockManager.getTransactionPages(tid);
+        if (pages != null) {
+            for (PageId page : pages) {
+                flushPage(page);
+            }
+        }
     }
 
     /**
@@ -240,18 +257,24 @@ public class BufferPool {
      * Flushes the page to disk to ensure dirty pages are updated on disk.
      */
     private synchronized void evictPage() throws DbException {
-        PageId front = pageQue.poll();
-        while (pageCache.get(front) == null) {
-            front = pageQue.poll();
-        }
-        Page p = pageCache.get(front);
-        if (p.isDirty() != null) {
-            try {
-                flushPage(front);
-            } catch (IOException e) {
-                e.printStackTrace();
+        PageId front = null;
+        int index = 0;
+        while (index < pageQue.size() && (front = pageQue.poll()) != null) {
+            Page page = pageCache.get(front);
+            if (page != null) {
+                if (page.isDirty() == null) {
+                    break;
+                }
+                //如果是脏页面,不能驱逐,重新放到队尾
+                pageQue.add(page.getId());
             }
+            ++index;
         }
+        //说明整个队列都是脏页面
+        if (front == null) {
+            throw new DbException("All pages are dirty!");
+        }
+        assert pageCache.get(front).isDirty() == null;
         pageCache.remove(front);
     }
 
