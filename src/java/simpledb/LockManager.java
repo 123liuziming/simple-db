@@ -120,8 +120,8 @@ public class LockManager {
         for (TransactionId transactionId : tids) {
             endTransaction(transactionId);
         }
-        assert pageIdLockItemMap.isEmpty();
-        assert transactionIdPagesMap.isEmpty();
+        pageIdLockItemMap.clear();
+        transactionIdPagesMap.clear();
     }
 }
 
