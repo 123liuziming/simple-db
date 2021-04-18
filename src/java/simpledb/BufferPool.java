@@ -95,6 +95,9 @@ public class BufferPool {
     }
 
     public void addPageToBufferPool(Page page) throws DbException {
+        if (page == null) {
+            return;
+        }
         pageCache.put(page.getId(), page);
         pageQue.add(page.getId());
         if (pageCache.size() > NUM_PAGES) {
@@ -274,7 +277,9 @@ public class BufferPool {
         if (front == null) {
             throw new DbException("All pages are dirty!");
         }
-        assert pageCache.get(front).isDirty() == null;
+        if (pageCache.get(front).isDirty() != null) {
+            throw new DbException("?");
+        }
         pageCache.remove(front);
     }
 

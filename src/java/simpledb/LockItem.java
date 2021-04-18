@@ -59,11 +59,19 @@ public class LockItem {
         return holders.contains(tid);
     }
 
+    public boolean holdExclusively(TransactionId tid) {
+        return holders.size() == 1 && holders.contains(tid);
+    }
+
     public void deleteHolder(TransactionId tid) {
         holders.remove(tid);
     }
 
     public void signalAll() {
         condition.signalAll();
+    }
+
+    public void upgradeLock() {
+        this.type = Permissions.READ_WRITE;
     }
 }

@@ -14,11 +14,7 @@ public class LockManager {
         if (!pageIdLockItemMap.containsKey(pageId)) {
             pageIdLockItemMap.put(pageId, new LockItem(perm));
         }
-        //如果已经持有了该线程，直接返回
         Set<PageId> pages = transactionIdPagesMap.getOrDefault(tid, new HashSet<>());
-        if (pages != null && pages.contains(pageId)) {
-            return;
-        }
         //获取锁
         LockItem lockItem = pageIdLockItemMap.get(pageId);
         lockItem.acquire();
@@ -33,17 +29,30 @@ public class LockManager {
                         lockItem.addHolders(tid);
                         break;
                     } else {
-                        //读-写，阻塞
-                        lockItem.waitForCondition();
+                        //如果持有者只有一个事务，可能可以升级为X锁
+                        LockItem item = pageIdLockItemMap.get(pageId);
+                        if (item.isHolder(tid) && item.holdExclusively(tid)) {
+                            item.upgradeLock();
+                            break;
+                        }
+                        else {
+                            //读-写，阻塞
+                            lockItem.waitForCondition();
+                        }
                     }
                 }
                 //写请求
                 else {
-                    //没人有锁
+                    //没人有锁或者
                     if (!lockItem.hasHolder()) {
                         lockItem.addHolders(tid);
                         break;
                     }
+                    //只有本事务持有锁
+                    else if (lockItem.holdExclusively(tid)) {
+                        break;
+                    }
+                    //写-写冲突，阻塞等待唤醒
                     else {
                         lockItem.waitForCondition();
                     }

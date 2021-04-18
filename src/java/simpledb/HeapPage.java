@@ -41,7 +41,7 @@ public class HeapPage implements Page {
      * @see Catalog#getTupleDesc
      * @see BufferPool#getPageSize()
      */
-    public HeapPage(HeapPageId id, byte[] data) throws IOException {
+    public HeapPage(HeapPageId id, byte[] data) throws IOException, DbException {
         this.pid = id;
         this.td = Database.getCatalog().getTupleDesc(id.getTableId());
         this.numSlots = getNumTuples();
@@ -62,11 +62,7 @@ public class HeapPage implements Page {
         }
         dis.close();
         setBeforeImage();
-        try {
-            Database.getBufferPool().addPageToBufferPool(this);
-        } catch (DbException e) {
-            e.printStackTrace();
-        }
+        Database.getBufferPool().addPageToBufferPool(this);
     }
 
     /** Retrieve the number of tuples on this page.
@@ -98,7 +94,11 @@ public class HeapPage implements Page {
             {
                 oldDataRef = oldData;
             }
-            return new HeapPage(pid,oldDataRef);
+            try {
+                return new HeapPage(pid, oldDataRef);
+            } catch (DbException e) {
+                e.printStackTrace();
+            }
         } catch (IOException e) {
             e.printStackTrace();
             //should never happen -- we parsed it OK before!
