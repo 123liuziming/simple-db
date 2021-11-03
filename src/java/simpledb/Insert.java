@@ -80,14 +80,13 @@ public class Insert extends Operator {
         } else {
             Tuple ret = new Tuple(new TupleDesc(new Type[]{Type.INT_TYPE}));
             int num = 0;
-            DbFile dbFile = Database.getCatalog().getDatabaseFile(tableId);
             while (child.hasNext()) {
                 try {
-                    dbFile.insertTuple(t, child.next());
+                    Database.getBufferPool().insertTuple(this.t, this.tableId, child.next());
                 } catch (Exception e) {
                     throw new DbException("insert Tuple failed");
                 }
-                ++num;
+                num++;
             }
             ret.setField(0, new IntField(num));
             state = true;

@@ -7,9 +7,9 @@ import java.util.concurrent.locks.Lock;
 public class LockManager {
 
     //存储每一页对应的锁
-    private Map<PageId, LockItem> pageIdLockItemMap = new ConcurrentHashMap<>();
+    private Map<PageId, LockItem> pageIdLockItemMap = new HashMap<>();
     //储存某个事务对应的所有页
-    private Map<TransactionId, Set<PageId>> transactionIdPagesMap = new ConcurrentHashMap<>();
+    private Map<TransactionId, Set<PageId>> transactionIdPagesMap = new HashMap<>();
 
     private final static LockManager lockManager = new LockManager();
 
@@ -31,8 +31,6 @@ public class LockManager {
 
     public synchronized void acquireLock(TransactionId tid, PageId pageId, Permissions perm) throws TransactionAbortedException {
         //初始化
-        System.out.println("begin to acquire lock " + pageId.getPageNumber() + " " + tid.getId());
-
         if (!pageIdLockItemMap.containsKey(pageId)) {
             pageIdLockItemMap.put(pageId, new LockItem(perm));
         }
@@ -77,7 +75,6 @@ public class LockManager {
                 }
                 lockItem = pageIdLockItemMap.get(pageId);
             }
-            System.out.println(perm + " lock acquired " + pageId.getPageNumber() + " " + tid.getId());
 
             //将此页面加入某个事务中
             Set<PageId> pages = transactionIdPagesMap.getOrDefault(tid, new HashSet<>());
@@ -104,10 +101,8 @@ public class LockManager {
             lockItem.deleteHolder(tid);
             //唯一的持有者都没有了，直接从map里删除这一项
             if (!lockItem.hasHolder()) {
-                System.out.println("removing item " + pid.getPageNumber() + " " + tid.getId());
                 pageIdLockItemMap.remove(pid);
             }
-            System.out.println(tid.getId() + " release lock on page " + pid.getPageNumber());
             notifyAll();
         } catch (Exception e) {
             e.printStackTrace();
@@ -135,8 +130,7 @@ public class LockManager {
     }
 
     public synchronized void reset() {
-        Set<TransactionId> tids = new HashSet<>(transactionIdPagesMap.keySet());
-        for (TransactionId transactionId : tids) {
+        for (TransactionId transactionId : transactionIdPagesMap.keySet()) {
             endTransaction(transactionId);
         }
         pageIdLockItemMap.clear();

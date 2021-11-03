@@ -39,9 +39,12 @@ public class BufferPool {
      * @param numPages maximum number of pages in this buffer pool.
      */
     public BufferPool(int numPages) {
-        this.pageCache = new HashMap<>(numPages << 1);
+        if (numPages != 1) {
+            numPages <<= 1;
+        }
+        this.pageCache = new HashMap<>(numPages);
         this.pageQue = new LinkedList<>();
-        NUM_PAGES = numPages > 0 ? numPages << 1 : DEFAULT_PAGES;
+        NUM_PAGES = numPages > 0 ? numPages : DEFAULT_PAGES;
     }
     
     public static int getPageSize() {
@@ -146,7 +149,6 @@ public class BufferPool {
                 }
             }
         }
-        System.out.println("transaction " + tid.getId() + " complete");
         LockManager.getInstance().endTransaction(tid);
     }
 
