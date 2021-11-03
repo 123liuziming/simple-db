@@ -114,6 +114,7 @@ public class HeapFile implements DbFile {
             //System.out.println("ins: " + tid.getId() + " get page " + pgNo + " success " + p.isSlotUsed(0) + " " + p.isSlotUsed(1));
             if (p.getNumEmptySlots() > 0) {
                 p.insertTuple(t);
+                p.markDirty(true, tid);
                 result.add(p);
                 break;
             }
@@ -126,6 +127,7 @@ public class HeapFile implements DbFile {
         if (pgNo == numPages()) {
             HeapPage p = new HeapPage(new HeapPageId(getId(), pgNo), HeapPage.createEmptyPageData());
             p.insertTuple(t);
+            p.markDirty(true, tid);
             result.add(p);
             writePage(p);
         }
