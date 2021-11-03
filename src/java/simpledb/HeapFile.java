@@ -109,11 +109,17 @@ public class HeapFile implements DbFile {
         int pgNo = 0;
         ArrayList<Page> result = new ArrayList<>();
         for (; pgNo < numPages(); ++pgNo) {
+            //System.out.println("ins: " + tid.getId() + " try to get page " + pgNo);
             HeapPage p = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(getId(), pgNo), Permissions.READ_WRITE);
+            //System.out.println("ins: " + tid.getId() + " get page " + pgNo + " success " + p.isSlotUsed(0) + " " + p.isSlotUsed(1));
             if (p.getNumEmptySlots() > 0) {
                 p.insertTuple(t);
                 result.add(p);
                 break;
+            }
+            // 如果该页面没有空间，要把这页释放掉
+            if (p.getNumEmptySlots() == 0) {
+                Database.getBufferPool().releasePage(tid, p.pid);
             }
         }
         // 新取一页
@@ -129,7 +135,9 @@ public class HeapFile implements DbFile {
     // see DbFile.java for javadocs
     public ArrayList<Page> deleteTuple(TransactionId tid, Tuple t) throws DbException,
             TransactionAbortedException {
+        //System.out.println(tid.getId() + " try to get page " + t.getRecordId().getPageId().getPageNumber());
         HeapPage p = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(getId(), t.getRecordId().getPageId().getPageNumber()), Permissions.READ_WRITE);
+        //System.out.println(tid.getId() + " get page " + t.getRecordId().getPageId().getPageNumber() + " success " + p.isSlotUsed(0) + " " + p.isSlotUsed(1));
         if (p == null) {
             throw new DbException("no such page");
         }

@@ -39,9 +39,9 @@ public class BufferPool {
      * @param numPages maximum number of pages in this buffer pool.
      */
     public BufferPool(int numPages) {
-        this.pageCache = new HashMap<>(numPages);
+        this.pageCache = new HashMap<>(numPages << 1);
         this.pageQue = new LinkedList<>();
-        NUM_PAGES = numPages > 0 ? numPages : DEFAULT_PAGES;
+        NUM_PAGES = numPages > 0 ? numPages << 1 : DEFAULT_PAGES;
     }
     
     public static int getPageSize() {
@@ -75,23 +75,14 @@ public class BufferPool {
      */
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
         throws TransactionAbortedException, DbException {
-        LockManager.acquireLock(tid, pid, perm);
-        try {
-            DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
-            if (pageCache.containsKey(pid)) {
-                Page p = pageCache.get(pid);
-                if (p.isDirty() != null) {
-                    file.writePage(p);
-                }
-                return p;
-            }
-            Page page = file.readPage(pid);
-            addPageToBufferPool(page);
-            return page;
-        } catch (IOException e) {
-            e.printStackTrace();
+        LockManager.getInstance().acquireLock(tid, pid, perm);
+        DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
+        if (pageCache.containsKey(pid)) {
+            return pageCache.get(pid);
         }
-        return null;
+        Page page = file.readPage(pid);
+        addPageToBufferPool(page);
+        return page;
     }
 
     public void addPageToBufferPool(Page page) throws DbException {
@@ -115,7 +106,7 @@ public class BufferPool {
      * @param pid the ID of the page to unlock
      */
     public void releasePage(TransactionId tid, PageId pid) {
-        LockManager.releaseLock(pid, tid);
+        LockManager.getInstance().releaseLock(pid, tid);
     }
 
     /**
@@ -129,7 +120,7 @@ public class BufferPool {
 
     /** Return true if the specified transaction has a lock on the specified page */
     public boolean holdsLock(TransactionId tid, PageId p) {
-        return LockManager.holdsLock(tid, p);
+        return LockManager.getInstance().holdsLock(tid, p);
     }
 
     /**
@@ -145,7 +136,7 @@ public class BufferPool {
             flushPages(tid);
         }
         else {
-            Set<PageId> pages = LockManager.getTransactionPages(tid);
+            Set<PageId> pages = LockManager.getInstance().getTransactionPages(tid);
             if (pages != null) {
                 for (PageId page : pages) {
                     Page p = pageCache.get(page);
@@ -155,7 +146,8 @@ public class BufferPool {
                 }
             }
         }
-        LockManager.endTransaction(tid);
+        System.out.println("transaction " + tid.getId() + " complete");
+        LockManager.getInstance().endTransaction(tid);
     }
 
     /**
@@ -247,7 +239,7 @@ public class BufferPool {
     /** Write all pages of the specified transaction to disk.
      */
     public synchronized void flushPages(TransactionId tid) throws IOException {
-        Set<PageId> pages = LockManager.getTransactionPages(tid);
+        Set<PageId> pages = LockManager.getInstance().getTransactionPages(tid);
         if (pages != null) {
             for (PageId page : pages) {
                 flushPage(page);

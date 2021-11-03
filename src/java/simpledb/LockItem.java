@@ -1,6 +1,7 @@
 package simpledb;
 
 import java.util.HashSet;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
@@ -8,18 +9,19 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class LockItem {
-    private static int MAX_WAIT = 5;
-
-
     private ReentrantLock lock;
     private Condition condition;
     private Permissions type;
     private Set<TransactionId> holders;
 
     LockItem(Permissions type) {
+        this();
+        this.type = type;
+    }
+
+    LockItem() {
         this.lock = new ReentrantLock();
         this.condition = this.lock.newCondition();
-        this.type = type;
         this.holders = new HashSet<>();
     }
 
@@ -39,7 +41,7 @@ public class LockItem {
 
     public void waitForCondition() throws TransactionAbortedException {
         try {
-            if (!condition.await(MAX_WAIT, TimeUnit.SECONDS)) {
+            if (!condition.await(new Random().nextInt(1000) + 1000, TimeUnit.MILLISECONDS)) {
                 throw new TransactionAbortedException();
             }
         } catch (InterruptedException e) {

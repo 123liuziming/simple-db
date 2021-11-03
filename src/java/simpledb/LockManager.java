@@ -1,25 +1,44 @@
 package simpledb;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
 
 public class LockManager {
 
     //存储每一页对应的锁
-    private static Map<PageId, LockItem> pageIdLockItemMap = new HashMap<>();
-    //储存某个事务对应的所有事务
-    private static Map<TransactionId, Set<PageId>> transactionIdPagesMap = new HashMap<>();
+    private Map<PageId, LockItem> pageIdLockItemMap = new ConcurrentHashMap<>();
+    //储存某个事务对应的所有页
+    private Map<TransactionId, Set<PageId>> transactionIdPagesMap = new ConcurrentHashMap<>();
 
-    public static void acquireLock(TransactionId tid, PageId pageId, Permissions perm) throws TransactionAbortedException {
+    private final static LockManager lockManager = new LockManager();
+
+    private LockManager() {}
+
+    public static LockManager getInstance() {
+        return lockManager;
+    }
+
+    public synchronized void waitLock() throws TransactionAbortedException, InterruptedException {
+        long waitingStart = System.currentTimeMillis();
+        long eps = new Random().nextInt(900) + 100;
+        wait(eps);
+        long waitingEnd = System.currentTimeMillis();
+        if (waitingEnd - waitingStart > eps) {
+            throw new TransactionAbortedException();
+        }
+    }
+
+    public synchronized void acquireLock(TransactionId tid, PageId pageId, Permissions perm) throws TransactionAbortedException {
         //初始化
+        System.out.println("begin to acquire lock " + pageId.getPageNumber() + " " + tid.getId());
+
         if (!pageIdLockItemMap.containsKey(pageId)) {
             pageIdLockItemMap.put(pageId, new LockItem(perm));
         }
-        Set<PageId> pages = transactionIdPagesMap.getOrDefault(tid, new HashSet<>());
         //获取锁
         LockItem lockItem = pageIdLockItemMap.get(pageId);
-        lockItem.acquire();
-        assert pages != null;
-        pages.add(pageId);
+
         try {
             while (true) {
                 //请求的是读
@@ -29,15 +48,11 @@ public class LockManager {
                         lockItem.addHolders(tid);
                         break;
                     } else {
-                        //如果持有者只有一个事务，可能可以升级为X锁
-                        LockItem item = pageIdLockItemMap.get(pageId);
-                        if (item.isHolder(tid) && item.holdExclusively(tid)) {
-                            item.upgradeLock();
+                        if (lockItem.isHolder(tid) && lockItem.holdExclusively(tid)) {
+                            lockItem.upgradeLock();
                             break;
-                        }
-                        else {
-                            //读-写，阻塞
-                            lockItem.waitForCondition();
+                        } else {
+                            waitLock();
                         }
                     }
                 }
@@ -54,59 +69,63 @@ public class LockManager {
                     }
                     //写-写冲突，阻塞等待唤醒
                     else {
-                        lockItem.waitForCondition();
+                        waitLock();
                     }
                 }
+                if (!pageIdLockItemMap.containsKey(pageId)) {
+                    pageIdLockItemMap.put(pageId, new LockItem(perm));
+                }
+                lockItem = pageIdLockItemMap.get(pageId);
             }
+            System.out.println(perm + " lock acquired " + pageId.getPageNumber() + " " + tid.getId());
+
             //将此页面加入某个事务中
+            Set<PageId> pages = transactionIdPagesMap.getOrDefault(tid, new HashSet<>());
+            assert pages != null;
+            pages.add(pageId);
             transactionIdPagesMap.put(tid, pages);
-        } finally {
-            lockItem.release();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
     }
 
-    public static void releaseLock(PageId pid, TransactionId tid) {
+    public synchronized void releaseLock(PageId pid, TransactionId tid) {
+        //2.删除对应的页面
+        Set<PageId> pages = transactionIdPagesMap.get(tid);
+        if (pages != null) {
+            pages.remove(pid);
+            if (pages.isEmpty()) {
+                transactionIdPagesMap.remove(tid);
+            }
+        }
         //1.每一页对应的锁中删除此锁
         LockItem lockItem = pageIdLockItemMap.get(pid);
-        if (lockItem == null) {
-            System.out.println("本页面没有锁?");
-            return;
-        }
-        lockItem.acquire();
         try {
             lockItem.deleteHolder(tid);
             //唯一的持有者都没有了，直接从map里删除这一项
             if (!lockItem.hasHolder()) {
+                System.out.println("removing item " + pid.getPageNumber() + " " + tid.getId());
                 pageIdLockItemMap.remove(pid);
             }
-            //2.删除对应的页面
-            Set<PageId> pages = transactionIdPagesMap.get(tid);
-            if (pages != null) {
-                pages.remove(pid);
-                if (pages.isEmpty()) {
-                    transactionIdPagesMap.remove(tid);
-                }
-            }
-            lockItem.signalAll();
+            System.out.println(tid.getId() + " release lock on page " + pid.getPageNumber());
+            notifyAll();
         } catch (Exception e) {
             e.printStackTrace();
-        } finally {
-            lockItem.release();
         }
     }
 
     //判断是否持有锁
-    public static boolean holdsLock(TransactionId tid, PageId p) {
+    public synchronized boolean holdsLock(TransactionId tid, PageId p) {
         return pageIdLockItemMap.get(p).isHolder(tid);
     }
 
 
-    public static Set<PageId> getTransactionPages(TransactionId tid) {
+    public synchronized Set<PageId> getTransactionPages(TransactionId tid) {
         Set<PageId> pages = transactionIdPagesMap.get(tid);
         return pages == null ? null : new HashSet<>(pages);
     }
 
-    public static void endTransaction(TransactionId tid) {
+    public synchronized void endTransaction(TransactionId tid) {
         Set<PageId> pages = getTransactionPages(tid);
         if (pages != null) {
             for (PageId page : pages) {
@@ -115,7 +134,7 @@ public class LockManager {
         }
     }
 
-    public static void reset() {
+    public synchronized void reset() {
         Set<TransactionId> tids = new HashSet<>(transactionIdPagesMap.keySet());
         for (TransactionId transactionId : tids) {
             endTransaction(transactionId);

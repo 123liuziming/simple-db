@@ -197,7 +197,7 @@ public class BTreeFile implements DbFile {
 
         //中间节点
         if (pid.pgcateg() == BTreePageId.INTERNAL) {
-            BTreeInternalPage internalPage = (BTreeInternalPage) getPage(tid, dirtypages, pid, Permissions.READ_ONLY);
+            BTreeInternalPage internalPage = (BTreeInternalPage) getPage(tid, dirtypages, pid, perm);
             Iterator<BTreeEntry> internalIterator = internalPage.iterator();
             //为null直接返回最左边的
             if (f == null) {
@@ -277,6 +277,7 @@ public class BTreeFile implements DbFile {
         Iterator<Tuple> tupleIterator = page.reverseIterator();
         //分裂出一个新的叶子节点
         BTreeLeafPage newLeafPage = (BTreeLeafPage) getEmptyPage(tid, dirtypages, BTreePageId.LEAF);
+        System.out.println("spliting! " + page.pid.getPageNumber() + " " + newLeafPage.pid.getPageNumber());
         for (int i = 0; i < movCnt; ++i) {
             Tuple t = tupleIterator.next();
             page.deleteTuple(t);
