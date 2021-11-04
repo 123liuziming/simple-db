@@ -233,6 +233,7 @@ public class BufferPool {
             TransactionId tid = p.isDirty();
             if (tid != null) {
                 DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
+                p.markDirty(false, null);
                 file.writePage(p);
             }
         }

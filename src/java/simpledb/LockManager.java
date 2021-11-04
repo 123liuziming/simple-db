@@ -130,7 +130,8 @@ public class LockManager {
     }
 
     public synchronized void reset() {
-        for (TransactionId transactionId : transactionIdPagesMap.keySet()) {
+        Set<TransactionId> tids = new HashSet<>(transactionIdPagesMap.keySet());
+        for (TransactionId transactionId : tids) {
             endTransaction(transactionId);
         }
         pageIdLockItemMap.clear();

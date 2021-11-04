@@ -277,7 +277,6 @@ public class BTreeFile implements DbFile {
         Iterator<Tuple> tupleIterator = page.reverseIterator();
         //分裂出一个新的叶子节点
         BTreeLeafPage newLeafPage = (BTreeLeafPage) getEmptyPage(tid, dirtypages, BTreePageId.LEAF);
-        System.out.println("spliting! " + page.pid.getPageNumber() + " " + newLeafPage.pid.getPageNumber());
         for (int i = 0; i < movCnt; ++i) {
             Tuple t = tupleIterator.next();
             page.deleteTuple(t);
