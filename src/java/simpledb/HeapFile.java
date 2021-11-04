@@ -124,7 +124,6 @@ public class HeapFile implements DbFile {
         if (pgNo == numPages()) {
             HeapPage p = new HeapPage(new HeapPageId(getId(), pgNo), HeapPage.createEmptyPageData());
             p.insertTuple(t);
-            result.add(p);
             writePage(p);
         }
         return result;

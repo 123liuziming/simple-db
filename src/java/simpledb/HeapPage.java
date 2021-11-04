@@ -62,7 +62,6 @@ public class HeapPage implements Page {
         }
         dis.close();
         setBeforeImage();
-        Database.getBufferPool().addPageToBufferPool(this);
     }
 
     /** Retrieve the number of tuples on this page.

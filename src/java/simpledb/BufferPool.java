@@ -92,11 +92,11 @@ public class BufferPool {
         if (page == null) {
             return;
         }
-        pageCache.put(page.getId(), page);
-        pageQue.add(page.getId());
-        if (pageCache.size() > NUM_PAGES) {
+        if (pageCache.size() >= NUM_PAGES) {
             evictPage();
         }
+        pageCache.put(page.getId(), page);
+        pageQue.add(page.getId());
     }
 
     /**
@@ -135,20 +135,36 @@ public class BufferPool {
      */
     public void transactionComplete(TransactionId tid, boolean commit)
         throws IOException {
-        if (commit) {
-            flushPages(tid);
+        Set<PageId> pages = LockManager.getInstance().getTransactionPages(tid);
+        if (pages == null) {
+            return;
         }
-        else {
-            Set<PageId> pages = LockManager.getInstance().getTransactionPages(tid);
-            if (pages != null) {
-                for (PageId page : pages) {
-                    Page p = pageCache.get(page);
-                    if (p != null && p.isDirty() != null) {
-                        discardPage(page);
-                    }
-                }
+        for (PageId p : pages) {
+            Page pg = pageCache.get(p);
+            if (pg == null) {
+                continue;
+            }
+            if (commit) {
+                flushPage(p);
+                pg.setBeforeImage();
+            } else if (pg.isDirty() != null) {
+                discardPage(p);
             }
         }
+//        if (commit) {
+//            flushPages(tid);
+//        }
+//        else {
+//            Set<PageId> pages = LockManager.getInstance().getTransactionPages(tid);
+//            if (pages != null) {
+//                for (PageId page : pages) {
+//                    Page p = pageCache.get(page);
+//                    if (p != null && p.isDirty() != null) {
+//                        discardPage(page);
+//                    }
+//                }
+//            }
+//        }
         LockManager.getInstance().endTransaction(tid);
     }
 
@@ -173,6 +189,7 @@ public class BufferPool {
         ArrayList<Page> pages = f.insertTuple(tid, t);
         for (Page page : pages) {
             page.markDirty(true, tid);
+            pageCache.put(page.getId(), page);
         }
     }
 
@@ -232,9 +249,15 @@ public class BufferPool {
             Page p = pageCache.get(pid);
             TransactionId tid = p.isDirty();
             if (tid != null) {
-                DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
-                p.markDirty(false, null);
-                file.writePage(p);
+                try {
+                    //Database.getLogFile().logWrite(tid, p.getBeforeImage(), p);
+                    Database.getLogFile().force();
+                    DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
+                    p.markDirty(false, null);
+                    file.writePage(p);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         }
     }
