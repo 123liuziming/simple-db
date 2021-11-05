@@ -516,7 +516,7 @@ public class LogFile {
             synchronized (this) {
                 recoveryUndecided = false;
                 currentOffset = raf.length();
-                if (currentOffset <= LONG_SIZE) {
+                if (currentOffset < LONG_SIZE) {
                     return;
                 }
                 // 找到最后一个checkpoint
