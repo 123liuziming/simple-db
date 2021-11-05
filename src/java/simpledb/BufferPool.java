@@ -151,20 +151,9 @@ public class BufferPool {
                 discardPage(p);
             }
         }
-//        if (commit) {
-//            flushPages(tid);
-//        }
-//        else {
-//            Set<PageId> pages = LockManager.getInstance().getTransactionPages(tid);
-//            if (pages != null) {
-//                for (PageId page : pages) {
-//                    Page p = pageCache.get(page);
-//                    if (p != null && p.isDirty() != null) {
-//                        discardPage(page);
-//                    }
-//                }
-//            }
-//        }
+        if (commit) {
+            Database.getLogFile().logCommit(tid);
+        }
         LockManager.getInstance().endTransaction(tid);
     }
 
@@ -212,6 +201,7 @@ public class BufferPool {
         ArrayList<Page> pages = f.deleteTuple(tid, t);
         for (Page page : pages) {
             page.markDirty(true, tid);
+            pageCache.put(page.getId(), page);
         }
     }
 
@@ -250,10 +240,9 @@ public class BufferPool {
             TransactionId tid = p.isDirty();
             if (tid != null) {
                 try {
-                    //Database.getLogFile().logWrite(tid, p.getBeforeImage(), p);
+                    Database.getLogFile().logWrite(tid, p.getBeforeImage(), p);
                     Database.getLogFile().force();
                     DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
-                    p.markDirty(false, null);
                     file.writePage(p);
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -298,7 +287,7 @@ public class BufferPool {
         if (pageCache.get(front).isDirty() != null) {
             throw new DbException("?");
         }
-        pageCache.remove(front);
+        discardPage(front);
     }
 
 }

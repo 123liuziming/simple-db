@@ -161,7 +161,7 @@ public class HeapFile implements DbFile {
             }
 
             private void resetIterNow() throws TransactionAbortedException, DbException {
-                if (heapPageId.getPageNumber() * BufferPool.getPageSize() >= f.length()) {
+                if ((long) heapPageId.getPageNumber() * BufferPool.getPageSize() >= f.length()) {
                     iteratorNow = null;
                     return;
                 }

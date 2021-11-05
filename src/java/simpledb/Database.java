@@ -77,6 +77,7 @@ public class Database {
     // reset the database, used for unit tests only.
     public static void reset() {
         _instance.set(new Database());
+        LockManager.getInstance().reset();
     }
 
 }
