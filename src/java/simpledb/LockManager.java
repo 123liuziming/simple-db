@@ -124,6 +124,7 @@ public class LockManager {
         Set<PageId> pages = getTransactionPages(tid);
         if (pages != null) {
             for (PageId page : pages) {
+                Database.getBufferPool().discardPage(page);
                 releaseLock(page, tid);
             }
         }
